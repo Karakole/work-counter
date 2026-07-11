@@ -70,6 +70,23 @@
     return `${h}h ${pad(m)}m`;
   }
 
+  const dayFmt = new Intl.DateTimeFormat("fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const timeFmt = new Intl.DateTimeFormat("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  // Local YYYY-MM-DD key for grouping sessions by day
+  function dayKey(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  }
+
   // ---------- Mutations ----------
   function findClient(id) {
     return state.clients.find((c) => c.id === id);
@@ -248,6 +265,83 @@
   };
 
   const collapsed = new Set(); // client ids that are collapsed
+  const expanded = new Set(); // project ids whose history is open
+
+  // Build the session-history DOM for a project (most recent first)
+  function buildHistory(project) {
+    const frag = document.createDocumentFragment();
+    if (project.sessions.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "history-empty";
+      empty.textContent = "Aucune session enregistrée.";
+      frag.appendChild(empty);
+      return frag;
+    }
+
+    // group sessions by day
+    const groups = new Map();
+    project.sessions.forEach((s) => {
+      const key = dayKey(s.start);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(s);
+    });
+
+    // days sorted most recent first (by each group's latest start)
+    const days = [...groups.entries()].sort(
+      (a, b) =>
+        Math.max(...b[1].map((s) => s.start)) -
+        Math.max(...a[1].map((s) => s.start))
+    );
+
+    days.forEach(([, sessions]) => {
+      sessions.sort((a, b) => b.start - a.start); // recent first within day
+
+      const group = document.createElement("div");
+      group.className = "history-day";
+
+      const head = document.createElement("div");
+      head.className = "history-day-head";
+      const label = document.createElement("span");
+      label.textContent = dayFmt.format(new Date(sessions[0].start));
+      const dayTotal = sessions.reduce((t, s) => {
+        const end = s.end == null ? now() : s.end;
+        return t + Math.max(0, end - s.start);
+      }, 0);
+      const totalSpan = document.createElement("span");
+      totalSpan.className = "history-day-total";
+      totalSpan.textContent = fmt(dayTotal, true);
+      head.appendChild(label);
+      head.appendChild(totalSpan);
+      group.appendChild(head);
+
+      sessions.forEach((s) => {
+        const running = s.end == null;
+        const row = document.createElement("div");
+        row.className = "history-row" + (running ? " running" : "");
+
+        const range = document.createElement("span");
+        range.className = "history-range";
+        range.textContent = running
+          ? `${timeFmt.format(new Date(s.start))} → en cours`
+          : `${timeFmt.format(new Date(s.start))} → ${timeFmt.format(
+              new Date(s.end)
+            )}`;
+
+        const dur = document.createElement("span");
+        dur.className = "history-dur";
+        const end = running ? now() : s.end;
+        dur.textContent = fmt(Math.max(0, end - s.start), true);
+
+        row.appendChild(range);
+        row.appendChild(dur);
+        group.appendChild(row);
+      });
+
+      frag.appendChild(group);
+    });
+
+    return frag;
+  }
 
   function render() {
     const hasData = state.clients.length > 0;
@@ -277,7 +371,7 @@
 
       node.querySelector(".client-name").textContent = client.name;
       const totalEl = node.querySelector(".client-total");
-      totalEl.textContent = fmt(clientElapsed(client));
+      totalEl.textContent = fmt(clientElapsed(client), true);
 
       node.querySelector(".client-toggle").addEventListener("click", () => {
         if (collapsed.has(client.id)) collapsed.delete(client.id);
@@ -288,6 +382,15 @@
       node
         .querySelector(".client-delete")
         .addEventListener("click", () => deleteClient(client.id));
+
+      // Inline "add project to this client" form
+      const addForm = node.querySelector(".client-add");
+      const addInput = addForm.querySelector(".client-add-input");
+      addForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        addProject(client.name, addInput.value);
+        addInput.value = "";
+      });
 
       const list = node.querySelector(".project-list");
       client.projects.forEach((project) => {
@@ -300,14 +403,30 @@
 
         pNode.querySelector(".project-name").textContent = project.name;
         const count = completedSessions(project) + (running ? 1 : 0);
-        pNode.querySelector(".project-sessions").textContent =
-          count === 0
+        const sessionsBtn = pNode.querySelector(".project-sessions");
+        const isOpen = expanded.has(project.id);
+        sessionsBtn.textContent =
+          (count === 0
             ? "Aucune session"
-            : `${count} session${count > 1 ? "s" : ""}`;
+            : `${count} session${count > 1 ? "s" : ""}`) +
+          (count > 0 ? (isOpen ? " ▲" : " ▼") : "");
+        sessionsBtn.setAttribute("aria-expanded", String(isOpen));
+
+        const history = pNode.querySelector(".project-history");
+        if (isOpen && count > 0) {
+          history.hidden = false;
+          history.appendChild(buildHistory(project));
+        }
+        sessionsBtn.addEventListener("click", () => {
+          if (count === 0) return;
+          if (expanded.has(project.id)) expanded.delete(project.id);
+          else expanded.add(project.id);
+          render();
+        });
 
         pNode.querySelector(".project-time").textContent = fmt(
           projectElapsed(project),
-          running
+          true
         );
 
         pNode.querySelector(".timer-label").textContent = running
@@ -334,7 +453,8 @@
     els.statClients.textContent = String(state.clients.length);
     els.statProjects.textContent = String(totalProjects);
     els.statTime.textContent = fmt(
-      state.clients.reduce((t, c) => t + clientElapsed(c), 0)
+      state.clients.reduce((t, c) => t + clientElapsed(c), 0),
+      true
     );
 
     updateLive();
@@ -360,7 +480,7 @@
         const card = els.clients.querySelector(
           `.client-card[data-id="${client.id}"] .client-total`
         );
-        if (card) card.textContent = fmt(clientElapsed(client));
+        if (card) card.textContent = fmt(clientElapsed(client), true);
       }
     });
 
@@ -378,7 +498,8 @@
 
     // global total (recompute so it ticks with running work)
     els.statTime.textContent = fmt(
-      state.clients.reduce((t, c) => t + clientElapsed(c), 0)
+      state.clients.reduce((t, c) => t + clientElapsed(c), 0),
+      true
     );
 
     els.liveCard.hidden = !hasLive;

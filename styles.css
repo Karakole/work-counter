@@ -1,21 +1,21 @@
 :root {
-  --bg: #f4f6fb;
+  --bg: #e7ebf3;
   --bg-elev: #ffffff;
-  --bg-soft: #eef1f7;
-  --border: #e2e6ef;
-  --border-strong: #d3d9e6;
-  --text: #1a2233;
-  --text-soft: #5a6478;
-  --text-faint: #8a93a6;
-  --accent: #4f6bff;
-  --accent-soft: rgba(79, 107, 255, 0.12);
-  --accent-strong: #3a52e0;
-  --success: #17b877;
-  --success-soft: rgba(23, 184, 119, 0.14);
-  --danger: #e5484d;
-  --danger-soft: rgba(229, 72, 77, 0.12);
-  --shadow: 0 1px 2px rgba(20, 30, 60, 0.04), 0 8px 24px rgba(20, 30, 60, 0.06);
-  --shadow-sm: 0 1px 2px rgba(20, 30, 60, 0.06);
+  --bg-soft: #eaeef6;
+  --border: #c9d1e0;
+  --border-strong: #a9b4ca;
+  --text: #0d1424;
+  --text-soft: #414c63;
+  --text-faint: #69738a;
+  --accent: #3a55f0;
+  --accent-soft: rgba(58, 85, 240, 0.14);
+  --accent-strong: #2a3fd0;
+  --success: #0e9d63;
+  --success-soft: rgba(14, 157, 99, 0.16);
+  --danger: #d3363b;
+  --danger-soft: rgba(211, 54, 59, 0.14);
+  --shadow: 0 1px 2px rgba(20, 30, 60, 0.08), 0 10px 28px rgba(20, 30, 60, 0.10);
+  --shadow-sm: 0 1px 3px rgba(20, 30, 60, 0.12);
   --radius: 16px;
   --radius-sm: 10px;
   --mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
@@ -270,6 +270,35 @@ body {
 .project-list { display: flex; flex-direction: column; }
 .client-card.collapsed .project-list { display: none; }
 
+/* Inline add-project form on each client card */
+.client-add {
+  display: flex;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+.client-card.collapsed .client-add { display: none; }
+.client-add-input {
+  flex: 1;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: var(--text);
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.client-add-input::placeholder { color: var(--text-faint); }
+.client-add-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.btn-add-project { flex-shrink: 0; }
+
 /* ---------- Project row ---------- */
 .project-row {
   display: flex;
@@ -282,7 +311,71 @@ body {
 
 .project-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .project-name { font-weight: 600; font-size: 0.96rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-sessions { font-size: 0.76rem; color: var(--text-faint); }
+.project-sessions {
+  font-size: 0.76rem;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  align-self: flex-start;
+  transition: color 0.15s ease;
+}
+.project-sessions:hover { color: var(--accent); }
+
+/* ---------- Session history ---------- */
+.project-history {
+  padding: 4px 18px 16px 18px;
+  background: var(--bg-soft);
+  border-top: 1px solid var(--border);
+  animation: history-in 0.18s ease;
+}
+@keyframes history-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.history-empty { margin: 8px 0; font-size: 0.82rem; color: var(--text-faint); }
+.history-day { margin-top: 12px; }
+.history-day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.history-day-head > span:first-child {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-soft);
+  text-transform: capitalize;
+}
+.history-day-total {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+.history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 0;
+}
+.history-range { font-size: 0.83rem; color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.history-dur {
+  font-size: 0.83rem;
+  font-family: var(--mono);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.history-row.running .history-range,
+.history-row.running .history-dur { color: var(--success); font-weight: 600; }
 
 .project-timing { flex-shrink: 0; }
 .project-time {
